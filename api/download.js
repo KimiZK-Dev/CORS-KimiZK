@@ -83,14 +83,93 @@ export default async function handler(req, res) {
             const downloadReq = httpModule.request(options, (downloadRes) => {
                 console.log(`📊 Download response status: ${downloadRes.statusCode}`);
                 
-                // Handle redirects manually if needed
+                // Handle redirects manually - follow redirect automatically
                 if (downloadRes.statusCode >= 300 && downloadRes.statusCode < 400 && downloadRes.headers.location) {
                     console.log('🔄 Following redirect to:', downloadRes.headers.location);
-                    res.status(302).json({
-                        redirect: downloadRes.headers.location,
-                        message: 'Redirect required'
+                    
+                    // Recursively follow redirect
+                    const redirectUrl = downloadRes.headers.location;
+                    
+                    // Create new request for redirect URL
+                    const redirectUrlObj = url.parse(redirectUrl);
+                    const isRedirectHttps = redirectUrlObj.protocol === 'https:';
+                    const redirectHttpModule = isRedirectHttps ? https : http;
+                    const redirectPort = redirectUrlObj.port || (isRedirectHttps ? 443 : 80);
+                    
+                    const redirectOptions = {
+                        hostname: redirectUrlObj.hostname,
+                        port: redirectPort,
+                        path: redirectUrlObj.path,
+                        method: 'GET',
+                        headers: {
+                            'Accept': '*/*',
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
+                            'Referer': 'https://tikvid.io/',
+                            'Accept-Language': 'en-US,en;q=0.9',
+                            'Cache-Control': 'no-cache',
+                            'Connection': 'keep-alive'
+                        }
+                    };
+                    
+                    const redirectReq = redirectHttpModule.request(redirectOptions, (redirectRes) => {
+                        console.log(`📊 Redirect response status: ${redirectRes.statusCode}`);
+                        
+                        // Set headers for final response
+                        const contentType = redirectRes.headers['content-type'] || 'application/octet-stream';
+                        const contentLength = redirectRes.headers['content-length'];
+                        
+                        setCorsHeaders(res);
+                        res.setHeader('Content-Type', contentType);
+                        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+                        
+                        if (contentLength) {
+                            res.setHeader('Content-Length', contentLength);
+                            console.log(`📦 File size: ${contentLength} bytes`);
+                        }
+                        
+                        res.status(redirectRes.statusCode);
+                        
+                        redirectRes.on('error', (streamError) => {
+                            console.error('❌ Redirect stream error:', streamError.message);
+                            if (!res.headersSent) {
+                                res.status(500).json({ 
+                                    error: 'Redirect stream error', 
+                                    details: streamError.message 
+                                });
+                            }
+                            reject(streamError);
+                        });
+                        
+                        redirectRes.on('end', () => {
+                            console.log('✅ Redirect download completed successfully');
+                            resolve();
+                        });
+                        
+                        redirectRes.pipe(res);
                     });
-                    resolve();
+                    
+                    redirectReq.on('error', (error) => {
+                        console.error('❌ Redirect request error:', error.message);
+                        res.status(500).json({ 
+                            error: 'Redirect request failed', 
+                            details: error.message 
+                        });
+                        reject(error);
+                    });
+                    
+                    redirectReq.setTimeout(9000, () => {
+                        console.error('⏰ Redirect request timeout');
+                        redirectReq.abort();
+                        if (!res.headersSent) {
+                            res.status(408).json({ 
+                                error: 'Redirect timeout', 
+                                message: 'Redirect took too long' 
+                            });
+                        }
+                        reject(new Error('Redirect Timeout'));
+                    });
+                    
+                    redirectReq.end();
                     return;
                 }
                 
