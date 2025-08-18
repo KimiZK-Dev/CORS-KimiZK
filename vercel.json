@@ -8,16 +8,7 @@
       "runtime": "@vercel/node"
     }
   },
-  "routes": [
-    {
-      "src": "/api/proxy",
-      "dest": "/api/proxy.js"
-    },
-    {
-      "src": "/api/download", 
-      "dest": "/api/download.js"
-    }
-  ],
+
   "headers": [
     {
       "source": "/api/(.*)",
