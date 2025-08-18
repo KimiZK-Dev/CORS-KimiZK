@@ -1,0 +1,28 @@
+{
+  "name": "cors-kimizk-proxy",
+  "version": "1.0.0",
+  "description": "TikVid CORS Proxy API for Vercel - Download TikTok videos & audio",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "vercel build",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "@vercel/node": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "tiktok",
+    "downloader",
+    "cors",
+    "proxy",
+    "vercel",
+    "api",
+    "serverless"
+  ],
+  "author": "KimiZK-Dev",
+  "license": "MIT"
+}
