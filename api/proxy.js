@@ -180,21 +180,53 @@ const parseHtmlResponse = (htmlData) => {
 };
 
 // CORS headers for Vercel
-const setCorsHeaders = (res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+const setCorsHeaders = (res, origin) => {
+    // Allow specific origins including GitHub Pages
+    const allowedOrigins = [
+        'https://kimizk-dev.github.io',
+        'http://localhost:3000',
+        'http://localhost:8080',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:8080',
+        'http://127.0.0.1:5500'
+    ];
+    
+    // Check if the origin is in the allowed list
+    if (origin && allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    } else {
+        // Fallback to wildcard for development
+        res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, X-Requested-With');
+    res.setHeader('Access-Control-Allow-Credentials', 'false');
     res.setHeader('Access-Control-Max-Age', '86400');
+    res.setHeader('Vary', 'Origin');
 };
 
 // Main Vercel serverless function
 export default async function handler(req, res) {
-    // Set CORS headers
-    setCorsHeaders(res);
-    
-    // Handle preflight OPTIONS request
-    if (req.method === 'OPTIONS') {
-        res.status(204).end();
+    try {
+        // Get origin from request headers
+        const origin = req.headers.origin;
+        
+        console.log(`📥 Request from origin: ${origin || 'no origin'}`);
+        console.log(`📋 Request method: ${req.method}`);
+        
+        // Set CORS headers
+        setCorsHeaders(res, origin);
+        
+        // Handle preflight OPTIONS request
+        if (req.method === 'OPTIONS') {
+            console.log('✅ Handling OPTIONS preflight request');
+            res.status(204).end();
+            return;
+        }
+    } catch (corsError) {
+        console.error('❌ CORS setup error:', corsError);
+        res.status(500).json({ error: 'CORS configuration error' });
         return;
     }
     
