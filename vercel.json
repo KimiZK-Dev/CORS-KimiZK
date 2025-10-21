@@ -1,13 +1,8 @@
 {
   "version": 2,
   "routes": [
-    {
-      "src": "/api/proxy",
-      "dest": "/api/proxy.js"
-    },
-    {
-      "src": "/api/download", 
-      "dest": "/api/download.js"
-    }
+    { "src": "/api/proxy", "dest": "/api/proxy.js" },
+    { "src": "/api/download", "dest": "/api/download.js" },
+    { "src": "/api/youtube-proxy", "dest": "/api/youtube-proxy.js" }
   ]
 }
