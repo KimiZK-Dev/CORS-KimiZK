@@ -59,91 +59,51 @@ const normalizeYouTubeUrl = (rawUrl) => {
 
 export default async function handler(req, res) {
   try {
-    const origin = req.headers.origin;
-    setCorsHeaders(res, origin);
+    const inputUrl =
+      req.method === "POST"
+        ? req.body.url
+        : req.query.url;
 
-    if (req.method === 'OPTIONS') {
-      res.status(204).end();
-      return;
-    }
-
-    const rawUrl =
-      req.method === 'GET'
-        ? req.query.url
-        : req.body?.url || req.body?.data?.url;
-
-    if (!rawUrl) {
-      res.status(400).json({
+    if (!inputUrl) {
+      return res.status(400).json({
         success: false,
-        error: 'Missing parameter: url'
+        error: "Missing url"
       });
-      return;
     }
 
-    if (!isValidYouTubeUrl(rawUrl)) {
-      res.status(400).json({
+    const ytIdMatch = inputUrl.match(/[?&]v=([^&]+)/);
+    if (!ytIdMatch) {
+      return res.status(400).json({
         success: false,
-        error: 'Invalid YouTube URL'
+        error: "Invalid YouTube URL"
       });
-      return;
     }
 
-    const cleanUrl = normalizeYouTubeUrl(rawUrl);
+    const videoId = ytIdMatch[1];
 
-    if (!cleanUrl) {
-      res.status(400).json({
-        success: false,
-        error: 'Unsupported YouTube URL format'
-      });
-      return;
-    }
+    const apiUrl = "https://ytdown.to/proxy.php";
 
-    // 👉 Gửi URL sạch sang ytdown.io
-    const params = new URLSearchParams();
-    params.append('url', cleanUrl);
-
-    const ytRes = await fetch('https://ytdown.io/proxy.php', {
-      method: 'POST',
+    const ytRes = await fetch(apiUrl, {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)'
+        "Content-Type": "application/x-www-form-urlencoded"
       },
-      body: params
+      body: new URLSearchParams({
+        url: `https://www.youtube.com/watch?v=${videoId}`
+      })
     });
 
-    if (!ytRes.ok) {
-      res.status(ytRes.status).json({
-        success: false,
-        error: `Upstream error: ${ytRes.status}`
-      });
-      return;
-    }
+    const data = await ytRes.json();
 
-    const text = await ytRes.text();
-
-    // 🧠 ytdown đôi khi trả HTML → chặn luôn
-    if (!text.trim().startsWith('{')) {
-      res.status(502).json({
-        success: false,
-        error: 'Upstream returned non-JSON response'
-      });
-      return;
-    }
-
-    const data = JSON.parse(text);
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      input: rawUrl,
-      normalized: cleanUrl,
       data
     });
   } catch (err) {
-    console.error('YouTube proxy error:', err);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      error: err?.message || 'Internal server error'
+      error: err.message
     });
   }
 }
+
