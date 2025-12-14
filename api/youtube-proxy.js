@@ -52,6 +52,13 @@ const normalizeYouTubeUrl = (rawUrl) => {
 };
 
 export default async function handler(req, res) {
+  const origin = req.headers.origin;
+  setCorsHeaders(res, origin);
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  
   try {
     const inputUrl =
       req.method === "POST"
