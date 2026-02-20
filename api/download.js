@@ -1,11 +1,11 @@
 /**
- * 🚀 TikVid Download Proxy API for Vercel
- * 
- * Vercel serverless function that proxies download requests
+ * 🚀 Download Proxy API for Vercel
+ *
+ * Vercel serverless function that proxies download/stream requests
  * to bypass CORS restrictions
- * 
+ *
  * Usage:
- * GET /api/download?url=DOWNLOAD_URL&filename=FILENAME
+ * GET /api/download?url=DOWNLOAD_URL&filename=FILENAME&referer=REFERER(optional)
  */
 
 import https from 'https';
@@ -33,7 +33,7 @@ const setCorsHeaders = (res, origin) => {
     }
     
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, X-Requested-With');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, X-Requested-With, Range');
     res.setHeader('Access-Control-Allow-Credentials', 'false');
     res.setHeader('Access-Control-Max-Age', '86400');
     res.setHeader('Vary', 'Origin');
@@ -74,6 +74,7 @@ export default async function handler(req, res) {
     
     const downloadUrl = req.query.url;
     const filename = req.query.filename || 'download';
+    const referer = req.query.referer;
     
     console.log(`📥 Download request: ${downloadUrl}`);
     
@@ -92,6 +93,8 @@ export default async function handler(req, res) {
         const httpModule = isHttps ? https : http;
         const port = downloadUrlObj.port || (isHttps ? 443 : 80);
         
+        const inboundRange = req.headers.range;
+
         const options = {
             hostname: downloadUrlObj.hostname,
             port: port,
@@ -99,12 +102,13 @@ export default async function handler(req, res) {
             method: 'GET',
             headers: {
                 'Accept': '*/*',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
-                'Referer': 'https://tikvid.io/',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36',
+                'Referer': referer || `${downloadUrlObj.protocol}//${downloadUrlObj.hostname}/`,
                 'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
+                'Accept-Encoding': 'identity',
                 'Cache-Control': 'no-cache',
-                'Connection': 'keep-alive'
+                'Connection': 'keep-alive',
+                ...(inboundRange ? { 'Range': inboundRange } : {})
             }
         };
         
@@ -135,11 +139,12 @@ export default async function handler(req, res) {
                         method: 'GET',
                         headers: {
                             'Accept': '*/*',
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
-                            'Referer': 'https://tikvid.io/',
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36',
+                            'Referer': referer || `${redirectUrlObj.protocol}//${redirectUrlObj.hostname}/`,
                             'Accept-Language': 'en-US,en;q=0.9',
                             'Cache-Control': 'no-cache',
-                            'Connection': 'keep-alive'
+                            'Connection': 'keep-alive',
+                            ...(inboundRange ? { 'Range': inboundRange } : {})
                         }
                     };
                     
@@ -149,6 +154,8 @@ export default async function handler(req, res) {
                         // Set headers for final response
                         const contentType = redirectRes.headers['content-type'] || 'application/octet-stream';
                         const contentLength = redirectRes.headers['content-length'];
+                        const contentRange = redirectRes.headers['content-range'];
+                        const acceptRanges = redirectRes.headers['accept-ranges'];
                         
                         setCorsHeaders(res);
                         res.setHeader('Content-Type', contentType);
@@ -158,6 +165,8 @@ export default async function handler(req, res) {
                             res.setHeader('Content-Length', contentLength);
                             console.log(`📦 File size: ${contentLength} bytes`);
                         }
+                        if (contentRange) res.setHeader('Content-Range', contentRange);
+                        if (acceptRanges) res.setHeader('Accept-Ranges', acceptRanges);
                         
                         res.status(redirectRes.statusCode);
                         
@@ -208,6 +217,8 @@ export default async function handler(req, res) {
                 // Set appropriate headers for file download
                 const contentType = downloadRes.headers['content-type'] || 'application/octet-stream';
                 const contentLength = downloadRes.headers['content-length'];
+                const contentRange = downloadRes.headers['content-range'];
+                const acceptRanges = downloadRes.headers['accept-ranges'];
                 
                 // Override CORS headers and set download headers
                 setCorsHeaders(res);
@@ -218,6 +229,8 @@ export default async function handler(req, res) {
                     res.setHeader('Content-Length', contentLength);
                     console.log(`📦 File size: ${contentLength} bytes`);
                 }
+                if (contentRange) res.setHeader('Content-Range', contentRange);
+                if (acceptRanges) res.setHeader('Accept-Ranges', acceptRanges);
                 
                 res.status(downloadRes.statusCode);
                 

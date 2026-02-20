@@ -1,7 +1,7 @@
 {
   "name": "cors-kimizk-proxy",
   "version": "1.0.0",
-  "description": "TikVid CORS Proxy API for Vercel - Download TikTok videos & audio",
+  "description": "CORS Proxy API for Vercel - TikVid + Downr YouTube audio/video",
   "type": "module",
 
   "engines": {
@@ -9,6 +9,10 @@
   },
   "keywords": [
     "tiktok",
+    "youtube",
+    "downr",
+    "audio",
+    "video",
     "downloader",
     "cors",
     "proxy",

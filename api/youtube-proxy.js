@@ -1,6 +1,6 @@
 // api/youtube-proxy.js
 /**
- * 🚀 YouTube CORS Proxy API for Vercel (ytdown.io)
+ * 🚀 YouTube CORS Proxy API for Vercel (downr.org)
  */
 
 const setCorsHeaders = (res, origin) => {
@@ -23,8 +23,18 @@ const setCorsHeaders = (res, origin) => {
 };
 
 
-// ✅ Chỉ chấp nhận YouTube
-const isValidYouTubeUrl = (u) => {
+// ✅ Kiểm tra URL hợp lệ
+const isValidUrl = (u) => {
+  try {
+    const parsed = new URL(u);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+// ✅ Nhận diện YouTube để chuẩn hóa (nếu có)
+const isYouTubeUrl = (u) => {
   return /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(u);
 };
 
@@ -72,27 +82,44 @@ export default async function handler(req, res) {
       });
     }
 
-    const ytIdMatch = inputUrl.match(/[?&]v=([^&]+)/);
-    if (!ytIdMatch) {
+    if (!isValidUrl(inputUrl)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid URL"
+      });
+    }
+
+    const normalizedUrl = isYouTubeUrl(inputUrl)
+      ? normalizeYouTubeUrl(inputUrl)
+      : inputUrl;
+
+    if (!normalizedUrl) {
       return res.status(400).json({
         success: false,
         error: "Invalid YouTube URL"
       });
     }
 
-    const videoId = ytIdMatch[1];
-
-    const apiUrl = "https://ytdown.to/proxy.php";
+    const apiUrl = "https://downr.org/.netlify/functions/nyt";
 
     const ytRes = await fetch(apiUrl, {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+        "Accept": "application/json"
       },
-      body: new URLSearchParams({
-        url: `https://www.youtube.com/watch?v=${videoId}`
+      body: JSON.stringify({
+        url: normalizedUrl
       })
     });
+
+    if (!ytRes.ok) {
+      return res.status(ytRes.status).json({
+        success: false,
+        error: `Downr API error: ${ytRes.status}`
+      });
+    }
 
     const data = await ytRes.json();
 
