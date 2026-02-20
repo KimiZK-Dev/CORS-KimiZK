@@ -106,6 +106,10 @@ export default async function handler(req, res) {
       req.method === "POST"
         ? req.body.url
         : req.query.url;
+    const inputSess =
+      req.headers["x-downr-sess"] ||
+      (req.method === "POST" ? req.body.sess : req.query.sess) ||
+      null;
 
     if (!inputUrl) {
       return res.status(400).json({
@@ -134,7 +138,8 @@ export default async function handler(req, res) {
 
     const apiUrl = "https://downr.org/.netlify/functions/nyt";
 
-    const sessCookie = await getDownrSession();
+    const sessCookie = inputSess ? `sess=${String(inputSess)}` : await getDownrSession();
+    const sessionUsed = !!sessCookie;
 
     const ytRes = await fetch(apiUrl, {
       method: "POST",
@@ -159,7 +164,7 @@ export default async function handler(req, res) {
         details: errorText?.slice(0, 1000) || null,
         downrStatus: ytRes.status,
         downrStatusText: ytRes.statusText,
-        sessionUsed: !!sessCookie
+        sessionUsed
       });
     }
 
