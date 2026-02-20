@@ -1,6 +1,7 @@
 // api/youtube-proxy.js
 /**
- * 🚀 YouTube CORS Proxy API for Vercel (downr.org)
+ * 🚀 Media CORS Proxy API for Vercel (downr.org)
+ * - Fetches a session cookie from downr.org to avoid 403
  */
 
 const setCorsHeaders = (res, origin) => {
@@ -31,6 +32,37 @@ const isValidUrl = (u) => {
   } catch {
     return false;
   }
+};
+
+let cachedSess = null;
+let cachedSessAt = 0;
+const SESS_TTL_MS = 5 * 60 * 1000;
+
+const getDownrSession = async () => {
+  const now = Date.now();
+  if (cachedSess && now - cachedSessAt < SESS_TTL_MS) {
+    return cachedSess;
+  }
+
+  const resp = await fetch("https://downr.org/", {
+    method: "GET",
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Origin": "https://downr.org",
+      "Referer": "https://downr.org/"
+    }
+  });
+
+  const setCookie = resp.headers.get("set-cookie");
+  if (!setCookie) return null;
+
+  const sess = setCookie.split(",").map(s => s.trim()).find(s => s.startsWith("sess="));
+  if (!sess) return null;
+
+  cachedSess = sess.split(";")[0];
+  cachedSessAt = now;
+  return cachedSess;
 };
 
 // ✅ Nhận diện YouTube để chuẩn hóa (nếu có)
@@ -102,6 +134,8 @@ export default async function handler(req, res) {
 
     const apiUrl = "https://downr.org/.netlify/functions/nyt";
 
+    const sessCookie = await getDownrSession();
+
     const ytRes = await fetch(apiUrl, {
       method: "POST",
       headers: {
@@ -109,7 +143,8 @@ export default async function handler(req, res) {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
         "Accept": "application/json",
         "Origin": "https://downr.org",
-        "Referer": "https://downr.org/"
+        "Referer": "https://downr.org/",
+        ...(sessCookie ? { "Cookie": sessCookie } : {})
       },
       body: JSON.stringify({
         url: normalizedUrl
