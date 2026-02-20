@@ -152,9 +152,14 @@ export default async function handler(req, res) {
     });
 
     if (!ytRes.ok) {
+      const errorText = await ytRes.text();
       return res.status(ytRes.status).json({
         success: false,
-        error: `Downr API error: ${ytRes.status}`
+        error: `Downr API error: ${ytRes.status}`,
+        details: errorText?.slice(0, 1000) || null,
+        downrStatus: ytRes.status,
+        downrStatusText: ytRes.statusText,
+        sessionUsed: !!sessCookie
       });
     }
 
